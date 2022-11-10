@@ -1,0 +1,180 @@
+﻿@page "/fetchdata"
+
+<PageTitle>Weather forecast</PageTitle>
+
+@using MyFirstBlazorProejct2.DataDB
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<masterContext> ContextFactor
+
+<h1>Weather forecast</h1>
+
+<p>This component demonstrates fetching data from a service.</p>
+
+<button @onclick="ShowCreate">Create</button>
+<input @oninput="Search" placeholder="Search..." class="p-3" />
+
+@if (forecasts.Count() == 0)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Temp. (C)</th>
+                <th>Temp. (F)</th>
+                <th>Summary</th>
+                <th>Edit</th>
+                <th>Delete</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var forecast in forecasts)
+            {
+                <tr>
+                    <td>@forecast.Date</td>
+                    <td>@forecast.TemperatureC</td>
+                    <td>@forecast.TemperatureF</td>
+                    <td>@forecast.Summary</td>
+                    <td>
+                        <button class="btn btn-secondary" @onclick="@(e => Edit(@forecast.Id))">Edit</button>
+                    </td>
+                    <td>
+                        <button class="btn btn-secondary" @onclick="@(e => Delete(@forecast.Id))">Delete</button>
+                    </td>
+                        
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+
+
+@if(IsCreatedShown) {
+    <div class="backgroundPopupBox">
+        <div class="popupCreate">
+            <EditForm Model=@newWeatherForecast OnValidSubmit=@SaveChanges>
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                <input type="hidden" @bind="newWeatherForecast.Id">
+                <div class="form-group">
+                    <label class="control-label">Date</label>
+                    <input type="date" @bind="newWeatherForecast.Date" class="form-control" required />
+                    <span class="text-danger"></span>
+                </div>
+                <div class="form-group mt-3">
+                    <label class="control-label">Summary</label>
+                    <textarea @bind="newWeatherForecast.Summary" class="form-control"></textarea>
+                    <span class="text-danger"></span>
+                </div>
+                <div class="form-group mt-3">
+                    <label class="control-label">Temperature C</label>
+                    <input type="number" @bind="newWeatherForecast.TemperatureC" class="form-control" />
+                    <span class="text-danger"></span>
+                </div>
+                <div class="form-group mt-3">
+                    <label class="control-label">Temperature F</label>
+                    <input type="number" @bind="newWeatherForecast.TemperatureF" class="form-control" />
+                    <span class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
+                    <input type="submit" value="Save" class="saveProductChangesButton" />
+                </div>
+
+
+
+            </EditForm>
+
+            <div class="form-group">
+                <button class="btn btn-danger" @onclick="ClosePopup">Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+}
+
+
+
+
+
+
+
+@code {
+    private List<WeatherForecast>? forecasts = new List<WeatherForecast>();
+
+    WeatherForecast newWeatherForecast = new WeatherForecast();
+
+    bool IsCreatedShown = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        await UpdateTable();
+    }
+
+    private void ShowCreate() {
+        IsCreatedShown = true;
+    }
+
+    private async void SaveChanges()
+    {
+        var db = ContextFactor.CreateDbContext();
+
+        if (newWeatherForecast.Id == 0) {
+            db.WeatherForecasts.Add(newWeatherForecast);
+        } else {
+            db.Entry(newWeatherForecast).State = EntityState.Modified;
+        }
+
+        await db.SaveChangesAsync();
+        IsCreatedShown = false;
+        newWeatherForecast = new WeatherForecast();
+        await UpdateTable();
+        StateHasChanged();
+
+    }
+
+    private async Task UpdateTable()
+    {
+        var db = ContextFactor.CreateDbContext();
+        forecasts = await db.WeatherForecasts.OrderByDescending(x => x.Id).ToListAsync();
+
+    }
+
+    private async void Edit(int id)
+    {
+        var db = ContextFactor.CreateDbContext();
+        newWeatherForecast = await db.WeatherForecasts.FindAsync(id);
+        IsCreatedShown = true;
+        StateHasChanged();
+    }
+
+    private void ClosePopup()
+    {
+        IsCreatedShown = false;
+        newWeatherForecast = new WeatherForecast();
+        StateHasChanged();
+    }
+
+    private async void Delete(int id)
+    {
+        var db = ContextFactor.CreateDbContext();
+        var wf = await db.WeatherForecasts.FindAsync(id);
+        db.WeatherForecasts.Remove(wf);
+        await db.SaveChangesAsync();
+        await UpdateTable();
+        StateHasChanged();
+    }
+
+
+    private async void Search(ChangeEventArgs args)
+    {
+        var searchTerm = (string)args.Value;
+        var db = ContextFactor.CreateDbContext();
+        forecasts = await db.WeatherForecasts.Where(x => x.Summary.Contains(searchTerm)).OrderByDescending(x => x.Id).ToListAsync();
+        StateHasChanged();
+    }
+}
